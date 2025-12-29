@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WA Client (Remote)</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #eee; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        #chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { background: #333; padding: 10px; border-radius: 5px; max-width: 80%; }
+        .msg .meta { font-size: 0.8em; color: #888; margin-bottom: 4px; display: block; }
+        #controls { background: #252525; padding: 20px; display: flex; gap: 10px; border-top: 1px solid #444; }
+        input { background: #333; border: 1px solid #555; color: white; padding: 10px; border-radius: 4px; font-family: inherit; }
+        #to { width: 150px; }
+        #text { flex: 1; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #555; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div id="chat-container"></div>
+
+    <form id="controls">
+        <input type="text" id="to" placeholder="JID (e.g. 123@s.whatsapp.net)" required>
+        <input type="text" id="text" placeholder="Type a message..." required autocomplete="off">
+        <button type="submit" id="sendBtn">Send</button>
+    </form>
+
+    <script>
+        // CONFIGURATION
+        const API_BASE = 'http://192.168.100.53:3000';
+
+        const chatContainer = document.getElementById('chat-container');
+        const form = document.getElementById('controls');
+
+        async function pollMessages() {
+            try {
+                // Modified to use API_BASE
+                const res = await fetch(`${API_BASE}/messages`);
+                const messages = await res.json();
+                
+                if (messages.length > 0) {
+                    messages.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = 'msg';
+                        const date = new Date(msg.ts * 1000).toLocaleTimeString();
+                        div.innerHTML = `
+                            <span class="meta">${date} - ${msg.from}</span>
+                            <div>${msg.text}</div>
+                        `;
+                        chatContainer.appendChild(div);
+                    });
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            } catch (e) {
+                console.error("Poll error (check CORS/Network):", e);
+            }
+        }
+
+        setInterval(pollMessages, 2000);
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('sendBtn');
+            const toInput = document.getElementById('to');
+            const textInput = document.getElementById('text');
+
+            const payload = {
+                to: toInput.value.trim(),
+                text: textInput.value.trim()
+            };
+
+            if (!payload.to || !payload.text) return;
+
+            btn.disabled = true;
+            btn.textContent = '...';
+
+            try {
+                // Modified to use API_BASE
+                const res = await fetch(`${API_BASE}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                
+                if (data.ok) {
+                    textInput.value = '';
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown'));
+                }
+            } catch (err) {
+                alert('Network Error: Check console for CORS issues');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "wami",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "fast-glob": "^3.3.3",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
