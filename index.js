@@ -26,36 +26,54 @@ async function start() {
     if (qr) qrcode.generate(qr, { small: true })
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode
-      return code !== DisconnectReason.loggedOut ? start() : console.log("Logged out, delete auth folder.")
+      if (code !== DisconnectReason.loggedOut) {
+        start()
+      } else {
+        console.log("Session terminée. Supprimez le dossier ./auth.")
+      }
     }
-    if (connection === "open") console.log("Connected")
+    if (connection === "open") console.log("Connecté à WhatsApp")
   })
 
   sock.ev.on("messages.upsert", ({ messages }) => {
     const m = messages?.[0]
-    if (!m?.message) return
+    if (!m?.message || m.key.fromMe) return
+    
     const text =
       m.message.conversation ||
       m.message?.extendedTextMessage?.text ||
       m.message?.imageMessage?.caption ||
       ""
+    
     inbox.push({ from: m.key.remoteJid, text, ts: m.messageTimestamp })
     if (inbox.length > MAX) inbox.shift()
   })
 }
 
+// Endpoint POST mis à jour avec normalisation et gestion d'erreurs
 app.post("/send", async (req, res) => {
-  if (!sock) return res.status(503).json({ error: "not ready" })
+  if (!sock) return res.status(503).json({ error: "Service non prêt" })
+  
   const { to, text } = req.body
-  if (!to || !text) return res.status(400).json({ error: "missing fields" })
-  await sock.sendMessage(to, { text })
-  res.json({ ok: true })
+  if (!to || !text) return res.status(400).json({ error: "Champs manquants" })
+
+  try {
+    // Si 'to' est un numéro pur (ex: 33612345678), on ajoute le suffixe JID
+    const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`
+    
+    await sock.sendMessage(jid, { text })
+    res.json({ ok: true })
+  } catch (e) {
+    console.error("Erreur lors de l'envoi :", e)
+    res.status(500).json({ error: "Échec de l'envoi du message" })
+  }
 })
 
 app.get("/messages", (_, res) => {
-  res.json([...inbox])
-  inbox.length = 0
+  const messages = [...inbox]
+  inbox.length = 0 // Vide la file après lecture
+  res.json(messages)
 })
 
 start()
-app.listen(3000, () => console.log("API running"))
+app.listen(3000, () => console.log("API en ligne sur le port 3000"))
