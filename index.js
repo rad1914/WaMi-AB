@@ -1,3 +1,4 @@
+// @path: index.js
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -37,30 +38,34 @@ async function start() {
 
   sock.ev.on("messages.upsert", ({ messages }) => {
     const m = messages?.[0]
-    if (!m?.message || m.key.fromMe) return
-    
+
+    if (!m?.message) return
+
     const text =
       m.message.conversation ||
       m.message?.extendedTextMessage?.text ||
       m.message?.imageMessage?.caption ||
       ""
-    
-    inbox.push({ from: m.key.remoteJid, text, ts: m.messageTimestamp })
+
+    inbox.push({
+      from: m.key.remoteJid,
+      text,
+      ts: m.messageTimestamp,
+      fromMe: m.key.fromMe === true
+    })
     if (inbox.length > MAX) inbox.shift()
   })
 }
 
-// Endpoint POST mis à jour avec normalisation et gestion d'erreurs
 app.post("/send", async (req, res) => {
   if (!sock) return res.status(503).json({ error: "Service non prêt" })
-  
+
   const { to, text } = req.body
   if (!to || !text) return res.status(400).json({ error: "Champs manquants" })
 
   try {
-    // Si 'to' est un numéro pur (ex: 33612345678), on ajoute le suffixe JID
     const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`
-    
+
     await sock.sendMessage(jid, { text })
     res.json({ ok: true })
   } catch (e) {
@@ -71,7 +76,7 @@ app.post("/send", async (req, res) => {
 
 app.get("/messages", (_, res) => {
   const messages = [...inbox]
-  inbox.length = 0 // Vide la file après lecture
+  inbox.length = 0
   res.json(messages)
 })
 
