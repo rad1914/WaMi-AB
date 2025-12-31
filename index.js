@@ -1,4 +1,4 @@
-// @path: index.js
+// index.js
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -9,81 +9,64 @@ import qrcode from "qrcode-terminal"
 import express from "express"
 import cors from "cors"
 
-const app = express()
-app.use(cors({ origin: "*" }))
+const app = express();
+app.use(cors({ origin: "*" }));
 app.use(express.json())
-
-let sock
-const inbox = []
-const MAX = 200
+let sock, inbox = [], MAX = 200
 
 async function start() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth")
   const { version } = await fetchLatestBaileysVersion()
 
-  sock = makeWASocket({ auth: state, version })
-  sock.ev.on("creds.update", saveCreds)
+  sock = makeWASocket({
+    auth: state,
+    version,
+    emitOwnEvents: true
+  })
 
+  sock.ev.on("creds.update", saveCreds)
   sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
-    if (qr) qrcode.generate(qr, { small: true })
+    if (qr) qrcode.generate(qr, { small: !0 })
     if (connection === "close") {
-      const code = lastDisconnect?.error?.output?.statusCode
-      if (code !== DisconnectReason.loggedOut) {
-        start()
-      } else {
-        console.log("Session terminée. Supprimez le dossier ./auth.")
-      }
+      const c = lastDisconnect?.error?.output?.statusCode
+      c !== DisconnectReason.loggedOut ? start() : console.log("Session terminée. Supprimez ./auth.")
     }
-    if (connection === "open") console.log("Connecté à WhatsApp")
+    if (connection === "open") console.log("Connecté")
   })
 
   sock.ev.on("messages.upsert", ({ messages }) => {
-    const m = messages?.[0]
-
-    if (!m?.message) return
-
-    const text =
-      m.message.conversation ||
-      m.message?.extendedTextMessage?.text ||
-      m.message?.imageMessage?.caption ||
-      ""
-
-    const alt = m.key.remoteJidAlt || m.key.participantAlt || ""
-    const rawFrom = alt || m.key.remoteJid
-    const from = jidNormalizedUser(rawFrom)
-
-    inbox.push({
-      from,
-      text,
-      ts: m.messageTimestamp,
-      fromMe: m.key.fromMe === true
-    })
-    if (inbox.length > MAX) inbox.shift()
+    for (const m of messages || []) {
+      if (!m?.message) continue
+      const text = m.message.conversation || m.message?.extendedTextMessage?.text || m.message?.imageMessage?.caption || ""
+      const key = m.key || {}
+      const altId = key.participantAlt || key.remoteJidAlt
+      const primaryId = key.participant || key.remoteJid
+      const rawId = key.fromMe ? sock?.user?.id : (altId || primaryId)
+      const from = jidNormalizedUser(rawId)
+      const ts = m.messageTimestamp
+      inbox.push({ from, text, ts, fromMe: !!key.fromMe })
+      if (inbox.length > MAX) inbox.shift()
+    }
   })
 }
 
 app.post("/send", async (req, res) => {
   if (!sock) return res.status(503).json({ error: "Service non prêt" })
-
-  const { to, text } = req.body
+  const { to, text } = req.body;
   if (!to || !text) return res.status(400).json({ error: "Champs manquants" })
-
   try {
-    const jid = to.includes("@") ? to : `${to}@s.whatsapp.net`
-
-    await sock.sendMessage(jid, { text })
-    res.json({ ok: true })
-  } catch (e) {
-    console.error("Erreur lors de l'envoi :", e)
-    res.status(500).json({ error: "Échec de l'envoi du message" })
+    await sock.sendMessage(to.includes("@") ? to : `${to}@s.whatsapp.net`, { text });
+    res.json({ ok: !0 })
+  } catch {
+    res.status(500).json({ error: "Échec" })
   }
 })
 
 app.get("/messages", (_, res) => {
-  const messages = [...inbox]
-  inbox.length = 0
-  res.json(messages)
+  const m = [...inbox];
+  inbox.length = 0;
+  res.json(m)
 })
- 
-start()
-app.listen(3000, () => console.log("API en ligne sur le port 3000"))
+
+start();
+app.listen(3000, () => console.log("API 3000"))
