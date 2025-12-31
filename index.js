@@ -2,7 +2,8 @@
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason
+  DisconnectReason,
+  jidNormalizedUser
 } from "@whiskeysockets/baileys"
 import qrcode from "qrcode-terminal"
 import express from "express"
@@ -47,8 +48,12 @@ async function start() {
       m.message?.imageMessage?.caption ||
       ""
 
+    const alt = m.key.remoteJidAlt || m.key.participantAlt || ""
+    const rawFrom = alt || m.key.remoteJid
+    const from = jidNormalizedUser(rawFrom)
+
     inbox.push({
-      from: m.key.remoteJid,
+      from,
       text,
       ts: m.messageTimestamp,
       fromMe: m.key.fromMe === true
