@@ -84,6 +84,6 @@ app.get("/messages", (_, res) => {
   inbox.length = 0
   res.json(messages)
 })
-
+ 
 start()
 app.listen(3000, () => console.log("API en ligne sur le port 3000"))
