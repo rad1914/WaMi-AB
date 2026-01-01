@@ -71,7 +71,8 @@ export function resolveJid(m, sock){
 
   if (remote && typeof remote === "string" && remote.endsWith("@g.us")) {
     const groupJid = jidNormalizedUser(remote)
-    const userRaw = participant || (fromMe ? sock?.user?.id : remote)
+    const alt = k.remoteJidAlt || k.participantAlt
+    const userRaw = alt || participant || (fromMe ? sock?.user?.id : remote)
     const userJid = userRaw && jidNormalizedUser(userRaw)
     return userJid ? `${groupJid}|${userJid}` : groupJid
   }
