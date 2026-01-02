@@ -1,4 +1,5 @@
-// backend.js 
+// @path: index.js
+
 import makeWASocket,{useMultiFileAuthState,fetchLatestBaileysVersion,DisconnectReason}from"@whiskeysockets/baileys"
 import {resolveJid}from"./utils/jid.js"
 import qrcode from"qrcode-terminal"
